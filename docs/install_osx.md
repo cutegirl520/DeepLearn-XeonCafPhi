@@ -125,4 +125,4 @@ Then, whenever you want to update homebrew, switch back to the master branches, 
 
     # Done!
 
-At this point, you should be running the latest Homebrew packages and your Caffe-related modifications w
+At this point, you should be running the latest Homebrew packages and your Caffe-related modifications will remain in place.
