@@ -1,0 +1,139 @@
+@import url(http://fonts.googleapis.com/css?family=PT+Serif|Open+Sans:600,400);
+
+body {
+  padding:10px 50px 0 0;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 14px;
+  color: #232323;
+  background-color: #FBFAF7;
+  margin: 0;
+  line-height: 1.5rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color:#232323;
+  margin:36px 0 10px;
+}
+
+p, ul, ol, table, dl {
+  margin:0 0 22px;
+}
+
+h1, h2, h3 {
+  font-family: 'PT Serif', serif;
+  line-height:1.3;
+  font-weight: normal;
+  display: block;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+}
+
+h1 {
+  font-size: 30px;
+}
+
+h2 {
+  font-size: 24px;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+h4, h5, h6 {
+  font-family: 'PT Serif', serif;
+  font-weight: 700;
+}
+
+a {
+  color:#C30000;
+  text-decoration:none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a small {
+  font-size: 12px;
+}
+
+em {
+  font-style: italic;
+}
+
+strong {
+  font-weight:700;
+}
+
+ul {
+  padding-left: 25px;
+}
+
+ol {
+  list-style: decimal;
+  padding-left: 20px;
+}
+
+blockquote {
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-style: italic;
+}
+
+dl, dt, dd, dl p {
+  font-color: #444;
+}
+
+dl dt {
+  font-weight: bold;
+}
+
+dl dd {
+  padding-left: 20px;
+  font-style: italic;
+}
+
+dl p {
+  padding-left: 20px;
+  font-style: italic;
+}
+
+hr {
+  border:0;
+  background:#ccc;
+  height:1px;
+  margin:0 0 24px;
+}
+
+/* Images */
+
+img {
+  position: relative;
+  margin: 0 auto;
+  max-width: 650px;
+  padding: 5px;
+  margin: 10px 0 32px 0;
+  border: 1px solid #ccc;
+}
+
+p img {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  text-align: center;
+  border: none;
+}
+
+/* Code blocks */
+code, pre {
+  font-family: monospace;
+  color:#000;
+  font-size:12px;
+  line-height: 14px;
+}
+
+pre {
+  padding: 6px 12px
