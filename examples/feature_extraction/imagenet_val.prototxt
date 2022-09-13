@@ -231,4 +231,8 @@ layer {
 }
 layer {
   name: "loss"
-  type: "
+  type: "SoftmaxWithLoss"
+  bottom: "fc8"
+  bottom: "label"
+  top: "loss"
+}
