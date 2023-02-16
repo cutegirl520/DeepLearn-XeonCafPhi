@@ -291,4 +291,161 @@ class EuclideanLossLayer : public LossLayer<Dtype> {
    *      the targets @f$y@f$; Backward fills their diff with gradients
    *      @f$ \frac{\partial E}{\partial y} =
    *          \frac{1}{n} \sum\limits_{n=1}^N (y_n - \hat{y}_n)
-   *      @f$ if p
+   *      @f$ if propagate_down[1]
+   */
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  Blob<Dtype> diff_;
+};
+
+/**
+ * @brief Computes the hinge loss for a one-of-many classification task.
+ *
+ * @param bottom input Blob vector (length 2)
+ *   -# @f$ (N \times C \times H \times W) @f$
+ *      the predictions @f$ t @f$, a Blob with values in
+ *      @f$ [-\infty, +\infty] @f$ indicating the predicted score for each of
+ *      the @f$ K = CHW @f$ classes. In an SVM, @f$ t @f$ is the result of
+ *      taking the inner product @f$ X^T W @f$ of the D-dimensional features
+ *      @f$ X \in \mathcal{R}^{D \times N} @f$ and the learned hyperplane
+ *      parameters @f$ W \in \mathcal{R}^{D \times K} @f$, so a Net with just
+ *      an InnerProductLayer (with num_output = D) providing predictions to a
+ *      HingeLossLayer and no other learnable parameters or losses is
+ *      equivalent to an SVM.
+ *   -# @f$ (N \times 1 \times 1 \times 1) @f$
+ *      the labels @f$ l @f$, an integer-valued Blob with values
+ *      @f$ l_n \in [0, 1, 2, ..., K - 1] @f$
+ *      indicating the correct class label among the @f$ K @f$ classes
+ * @param top output Blob vector (length 1)
+ *   -# @f$ (1 \times 1 \times 1 \times 1) @f$
+ *      the computed hinge loss: @f$ E =
+ *        \frac{1}{N} \sum\limits_{n=1}^N \sum\limits_{k=1}^K
+ *        [\max(0, 1 - \delta\{l_n = k\} t_{nk})] ^ p
+ *      @f$, for the @f$ L^p @f$ norm
+ *      (defaults to @f$ p = 1 @f$, the L1 norm; L2 norm, as in L2-SVM,
+ *      is also available), and @f$
+ *      \delta\{\mathrm{condition}\} = \left\{
+ *         \begin{array}{lr}
+ *            1 & \mbox{if condition} \\
+ *           -1 & \mbox{otherwise}
+ *         \end{array} \right.
+ *      @f$
+ *
+ * In an SVM, @f$ t \in \mathcal{R}^{N \times K} @f$ is the result of taking
+ * the inner product @f$ X^T W @f$ of the features
+ * @f$ X \in \mathcal{R}^{D \times N} @f$
+ * and the learned hyperplane parameters
+ * @f$ W \in \mathcal{R}^{D \times K} @f$. So, a Net with just an
+ * InnerProductLayer (with num_output = @f$k@f$) providing predictions to a
+ * HingeLossLayer is equivalent to an SVM (assuming it has no other learned
+ * outside the InnerProductLayer and no other losses outside the
+ * HingeLossLayer).
+ */
+template <typename Dtype>
+class HingeLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit HingeLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param) {}
+
+  virtual inline const char* type() const { return "HingeLoss"; }
+
+ protected:
+  /// @copydoc HingeLossLayer
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  /**
+   * @brief Computes the hinge loss error gradient w.r.t. the predictions.
+   *
+   * Gradients cannot be computed with respect to the label inputs (bottom[1]),
+   * so this method ignores bottom[1] and requires !propagate_down[1], crashing
+   * if propagate_down[1] is set.
+   *
+   * @param top output Blob vector (length 1), providing the error gradient with
+   *      respect to the outputs
+   *   -# @f$ (1 \times 1 \times 1 \times 1) @f$
+   *      This Blob's diff will simply contain the loss_weight* @f$ \lambda @f$,
+   *      as @f$ \lambda @f$ is the coefficient of this layer's output
+   *      @f$\ell_i@f$ in the overall Net loss
+   *      @f$ E = \lambda_i \ell_i + \mbox{other loss terms}@f$; hence
+   *      @f$ \frac{\partial E}{\partial \ell_i} = \lambda_i @f$.
+   *      (*Assuming that this top Blob is not used as a bottom (input) by any
+   *      other layer of the Net.)
+   * @param propagate_down see Layer::Backward.
+   *      propagate_down[1] must be false as we can't compute gradients with
+   *      respect to the labels.
+   * @param bottom input Blob vector (length 2)
+   *   -# @f$ (N \times C \times H \times W) @f$
+   *      the predictions @f$t@f$; Backward computes diff
+   *      @f$ \frac{\partial E}{\partial t} @f$
+   *   -# @f$ (N \times 1 \times 1 \times 1) @f$
+   *      the labels -- ignored as we can't compute their error gradients
+   */
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+};
+
+/**
+ * @brief A generalization of MultinomialLogisticLossLayer that takes an
+ *        "information gain" (infogain) matrix specifying the "value" of all label
+ *        pairs.
+ *
+ * Equivalent to the MultinomialLogisticLossLayer if the infogain matrix is the
+ * identity.
+ *
+ * @param bottom input Blob vector (length 2-3)
+ *   -# @f$ (N \times C \times H \times W) @f$
+ *      the predictions @f$ \hat{p} @f$, a Blob with values in
+ *      @f$ [0, 1] @f$ indicating the predicted probability of each of the
+ *      @f$ K = CHW @f$ classes.  Each prediction vector @f$ \hat{p}_n @f$
+ *      should sum to 1 as in a probability distribution: @f$
+ *      \forall n \sum\limits_{k=1}^K \hat{p}_{nk} = 1 @f$.
+ *   -# @f$ (N \times 1 \times 1 \times 1) @f$
+ *      the labels @f$ l @f$, an integer-valued Blob with values
+ *      @f$ l_n \in [0, 1, 2, ..., K - 1] @f$
+ *      indicating the correct class label among the @f$ K @f$ classes
+ *   -# @f$ (1 \times 1 \times K \times K) @f$
+ *      (\b optional) the infogain matrix @f$ H @f$.  This must be provided as
+ *      the third bottom blob input if not provided as the infogain_mat in the
+ *      InfogainLossParameter. If @f$ H = I @f$, this layer is equivalent to the
+ *      MultinomialLogisticLossLayer.
+ * @param top output Blob vector (length 1)
+ *   -# @f$ (1 \times 1 \times 1 \times 1) @f$
+ *      the computed infogain multinomial logistic loss: @f$ E =
+ *        \frac{-1}{N} \sum\limits_{n=1}^N H_{l_n} \log(\hat{p}_n) =
+ *        \frac{-1}{N} \sum\limits_{n=1}^N \sum\limits_{k=1}^{K} H_{l_n,k}
+ *        \log(\hat{p}_{n,k})
+ *      @f$, where @f$ H_{l_n} @f$ denotes row @f$l_n@f$ of @f$H@f$.
+ */
+template <typename Dtype>
+class InfogainLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit InfogainLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param), infogain_() {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  // InfogainLossLayer takes 2-3 bottom Blobs; if there are 3 the third should
+  // be the infogain matrix.  (Otherwise the infogain matrix is loaded from a
+  // file specified by LayerParameter.)
+  virtual inline int ExactNumBottomBlobs() const { return -1; }
+  virtual inline int MinBottomBlobs() const { return 2; }
+  virtual inline int MaxBottomBlobs() const { return 3; }
+
+  virtual inline const char* type() const { return "InfogainLoss"; }
+
+ protected:
+  /// @copydoc InfogainLossLayer
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  /**
+   * @brief Computes the infogain loss error gradient w.r.t. the predictions.
+   *
+   * Gradients cannot be computed with respect to the label inputs (bottom[1]),
+   * so this method ignores bottom[1] and requires !propagate_down[1], cras
