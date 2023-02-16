@@ -146,4 +146,42 @@ class XavierFiller : public Filler<Dtype> {
   explicit XavierFiller(const FillerParameter& param)
       : Filler<Dtype>(param) {}
   virtual void Fill(Blob<Dtype>* blob) {
-    CHECK(blob-
+    CHECK(blob->count());
+    int fan_in = blob->count() / blob->num();
+    Dtype scale = sqrt(Dtype(3) / fan_in);
+    caffe_rng_uniform<Dtype>(blob->count(), -scale, scale,
+        blob->mutable_cpu_data());
+    CHECK_EQ(this->filler_param_.sparse(), -1)
+         << "Sparsity not supported by this Filler.";
+  }
+};
+
+
+/**
+ * @brief Get a specific filler from the specification given in FillerParameter.
+ *
+ * Ideally this would be replaced by a factory pattern, but we will leave it
+ * this way for now.
+ */
+template <typename Dtype>
+Filler<Dtype>* GetFiller(const FillerParameter& param) {
+  const std::string& type = param.type();
+  if (type == "constant") {
+    return new ConstantFiller<Dtype>(param);
+  } else if (type == "gaussian") {
+    return new GaussianFiller<Dtype>(param);
+  } else if (type == "positive_unitball") {
+    return new PositiveUnitballFiller<Dtype>(param);
+  } else if (type == "uniform") {
+    return new UniformFiller<Dtype>(param);
+  } else if (type == "xavier") {
+    return new XavierFiller<Dtype>(param);
+  } else {
+    CHECK(false) << "Unknown filler name: " << param.type();
+  }
+  return (Filler<Dtype>*)(NULL);
+}
+
+}  // namespace caffe
+
+#endif  // CAFFE_FILLER_HPP_
