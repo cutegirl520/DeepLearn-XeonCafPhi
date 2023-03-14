@@ -49,4 +49,20 @@ class PythonLayer : public Layer<Dtype> {
     }
   }
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& 
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+    try {
+      bp::call_method<bp::object>(self_, "backward", top, propagate_down,
+          bottom);
+    } catch (bp::error_already_set) {
+      PyErr_Print();
+      throw;
+    }
+  }
+
+ private:
+  PyObject* self_;
+};
+
+}  // namespace caffe
+
+#endif
