@@ -374,4 +374,108 @@ class LRNLayer : public Layer<Dtype> {
   int width_;
 
   // Fields used for normalization ACROSS_CHANNELS
-  // scale_ stores the intermediate
+  // scale_ stores the intermediate summing results
+  Blob<Dtype> scale_;
+
+  // Fields used for normalization WITHIN_CHANNEL
+  shared_ptr<SplitLayer<Dtype> > split_layer_;
+  vector<Blob<Dtype>*> split_top_vec_;
+  shared_ptr<PowerLayer<Dtype> > square_layer_;
+  Blob<Dtype> square_input_;
+  Blob<Dtype> square_output_;
+  vector<Blob<Dtype>*> square_bottom_vec_;
+  vector<Blob<Dtype>*> square_top_vec_;
+  shared_ptr<PoolingLayer<Dtype> > pool_layer_;
+  Blob<Dtype> pool_output_;
+  vector<Blob<Dtype>*> pool_top_vec_;
+  shared_ptr<PowerLayer<Dtype> > power_layer_;
+  Blob<Dtype> power_output_;
+  vector<Blob<Dtype>*> power_top_vec_;
+  shared_ptr<EltwiseLayer<Dtype> > product_layer_;
+  Blob<Dtype> product_input_;
+  vector<Blob<Dtype>*> product_bottom_vec_;
+};
+
+
+/**
+ * @brief Pools the input image by taking the max, average, etc. within regions.
+ *
+ * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ */
+template <typename Dtype>
+class PoolingLayer : public Layer<Dtype> {
+ public:
+  explicit PoolingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "Pooling"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+  // MAX POOL layers can output an extra top blob for the mask;
+  // others can only output the pooled inputs.
+  virtual inline int MaxTopBlobs() const {
+    return (this->layer_param_.pooling_param().pool() ==
+            PoolingParameter_PoolMethod_MAX) ? 2 : 1;
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  int kernel_h_, kernel_w_;
+  int stride_h_, stride_w_;
+  int pad_h_, pad_w_;
+  int channels_;
+  int height_, width_;
+  int pooled_height_, pooled_width_;
+  bool global_pooling_;
+  Blob<Dtype> rand_idx_;
+  Blob<int> max_idx_;
+};
+
+#ifdef USE_CUDNN
+/*
+ * @brief cuDNN implementation of PoolingLayer.
+ *        Fallback to PoolingLayer for CPU mode.
+*/
+template <typename Dtype>
+class CuDNNPoolingLayer : public PoolingLayer<Dtype> {
+ public:
+  explicit CuDNNPoolingLayer(const LayerParameter& param)
+      : PoolingLayer<Dtype>(param), handles_setup_(false) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual ~CuDNNPoolingLayer();
+  // Currently, cuDNN does not support the extra top blob.
+  virtual inline int MinTopBlobs() const { return -1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  bool handles_setup_;
+  cudnnHandle_t             handle_;
+  cudnnTensorDescriptor_t bottom_desc_, top_desc_;
+  cudnnPoolingDescriptor_t  pooling_desc_;
+  cudnnPoolingMode_t        mode_;
+};
+#endif
+
+}  // namespace caffe
+
+#endif  // CAFFE_VISION_LAYERS_HPP_
