@@ -218,4 +218,204 @@ static mxArray* do_get_weights() {
         mwSize dims[4] = {layer_blobs[j]->width(), layer_blobs[j]->height(),
             layer_blobs[j]->channels(), layer_blobs[j]->num()};
 
-        
+        mxArray* mx_weights =
+          mxCreateNumericArray(4, dims, mxSINGLE_CLASS, mxREAL);
+        mxSetCell(mx_layer_cells, j, mx_weights);
+        float* weights_ptr = reinterpret_cast<float*>(mxGetPr(mx_weights));
+
+        switch (Caffe::mode()) {
+        case Caffe::CPU:
+          caffe_copy(layer_blobs[j]->count(), layer_blobs[j]->cpu_data(),
+              weights_ptr);
+          break;
+        case Caffe::GPU:
+          caffe_copy(layer_blobs[j]->count(), layer_blobs[j]->gpu_data(),
+              weights_ptr);
+          break;
+        default:
+          mex_error("Unknown Caffe mode");
+        }
+      }
+    }
+  }
+
+  return mx_layers;
+}
+
+static void get_weights(MEX_ARGS) {
+  plhs[0] = do_get_weights();
+}
+
+static void set_mode_cpu(MEX_ARGS) {
+  Caffe::set_mode(Caffe::CPU);
+}
+
+static void set_mode_gpu(MEX_ARGS) {
+  Caffe::set_mode(Caffe::GPU);
+}
+
+static void set_device(MEX_ARGS) {
+  if (nrhs != 1) {
+    ostringstream error_msg;
+    error_msg << "Expected 1 argument, got " << nrhs;
+    mex_error(error_msg.str());
+  }
+
+  int device_id = static_cast<int>(mxGetScalar(prhs[0]));
+  Caffe::SetDevice(device_id);
+}
+
+static void get_init_key(MEX_ARGS) {
+  plhs[0] = mxCreateDoubleScalar(init_key);
+}
+
+static void init(MEX_ARGS) {
+  if (nrhs != 3) {
+    ostringstream error_msg;
+    error_msg << "Expected 3 arguments, got " << nrhs;
+    mex_error(error_msg.str());
+  }
+
+  char* param_file = mxArrayToString(prhs[0]);
+  char* model_file = mxArrayToString(prhs[1]);
+  char* phase_name = mxArrayToString(prhs[2]);
+
+  Phase phase;
+  if (strcmp(phase_name, "train") == 0) {
+      phase = TRAIN;
+  } else if (strcmp(phase_name, "test") == 0) {
+      phase = TEST;
+  } else {
+    mex_error("Unknown phase.");
+  }
+
+  net_.reset(new Net<float>(string(param_file), phase));
+  net_->CopyTrainedLayersFrom(string(model_file));
+
+  mxFree(param_file);
+  mxFree(model_file);
+  mxFree(phase_name);
+
+  init_key = random();  // NOLINT(caffe/random_fn)
+
+  if (nlhs == 1) {
+    plhs[0] = mxCreateDoubleScalar(init_key);
+  }
+}
+
+static void reset(MEX_ARGS) {
+  if (net_) {
+    net_.reset();
+    init_key = -2;
+    LOG(INFO) << "Network reset, call init before use it again";
+  }
+}
+
+static void forward(MEX_ARGS) {
+  if (nrhs != 1) {
+    ostringstream error_msg;
+    error_msg << "Expected 1 argument, got " << nrhs;
+    mex_error(error_msg.str());
+  }
+
+  plhs[0] = do_forward(prhs[0]);
+}
+
+static void backward(MEX_ARGS) {
+  if (nrhs != 1) {
+    ostringstream error_msg;
+    error_msg << "Expected 1 argument, got " << nrhs;
+    mex_error(error_msg.str());
+  }
+
+  plhs[0] = do_backward(prhs[0]);
+}
+
+static void is_initialized(MEX_ARGS) {
+  if (!net_) {
+    plhs[0] = mxCreateDoubleScalar(0);
+  } else {
+    plhs[0] = mxCreateDoubleScalar(1);
+  }
+}
+
+static void read_mean(MEX_ARGS) {
+    if (nrhs != 1) {
+        mexErrMsgTxt("Usage: caffe('read_mean', 'path_to_binary_mean_file'");
+        return;
+    }
+    const string& mean_file = mxArrayToString(prhs[0]);
+    Blob<float> data_mean;
+    LOG(INFO) << "Loading mean file from: " << mean_file;
+    BlobProto blob_proto;
+    bool result = ReadProtoFromBinaryFile(mean_file.c_str(), &blob_proto);
+    if (!result) {
+        mexErrMsgTxt("Couldn't read the file");
+        return;
+    }
+    data_mean.FromProto(blob_proto);
+    mwSize dims[4] = {data_mean.width(), data_mean.height(),
+                      data_mean.channels(), data_mean.num() };
+    mxArray* mx_blob =  mxCreateNumericArray(4, dims, mxSINGLE_CLASS, mxREAL);
+    float* data_ptr = reinterpret_cast<float*>(mxGetPr(mx_blob));
+    caffe_copy(data_mean.count(), data_mean.cpu_data(), data_ptr);
+    mexWarnMsgTxt("Remember that Caffe saves in [width, height, channels]"
+                  " format and channels are also BGR!");
+    plhs[0] = mx_blob;
+}
+
+/** -----------------------------------------------------------------
+ ** Available commands.
+ **/
+struct handler_registry {
+  string cmd;
+  void (*func)(MEX_ARGS);
+};
+
+static handler_registry handlers[] = {
+  // Public API functions
+  { "forward",            forward         },
+  { "backward",           backward        },
+  { "init",               init            },
+  { "is_initialized",     is_initialized  },
+  { "set_mode_cpu",       set_mode_cpu    },
+  { "set_mode_gpu",       set_mode_gpu    },
+  { "set_device",         set_device      },
+  { "get_weights",        get_weights     },
+  { "get_init_key",       get_init_key    },
+  { "reset",              reset           },
+  { "read_mean",          read_mean       },
+  // The end.
+  { "END",                NULL            },
+};
+
+
+/** -----------------------------------------------------------------
+ ** matlab entry point: caffe(api_command, arg1, arg2, ...)
+ **/
+void mexFunction(MEX_ARGS) {
+  mexLock();  // Avoid clearing the mex file.
+  if (nrhs == 0) {
+    mex_error("No API command given");
+    return;
+  }
+
+  { // Handle input command
+    char *cmd = mxArrayToString(prhs[0]);
+    bool dispatched = false;
+    // Dispatch to cmd handler
+    for (int i = 0; handlers[i].func != NULL; i++) {
+      if (handlers[i].cmd.compare(cmd) == 0) {
+        handlers[i].func(nlhs, plhs, nrhs-1, prhs+1);
+        dispatched = true;
+        break;
+      }
+    }
+    if (!dispatched) {
+      ostringstream error_msg;
+      error_msg << "Unknown command '" << cmd << "'";
+      mex_error(error_msg.str());
+    }
+    mxFree(cmd);
+  }
+}
