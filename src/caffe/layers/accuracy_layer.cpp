@@ -66,4 +66,29 @@ void AccuracyLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       // Top-k accuracy
       std::vector<std::pair<Dtype, int> > bottom_data_vector;
       for (int k = 0; k < num_labels; ++k) {
-        bo
+        bottom_data_vector.push_back(std::make_pair(
+            bottom_data[i * dim + k * inner_num_ + j], k));
+      }
+      std::partial_sort(
+          bottom_data_vector.begin(), bottom_data_vector.begin() + top_k_,
+          bottom_data_vector.end(), std::greater<std::pair<Dtype, int> >());
+      // check if true label is in top k predictions
+      for (int k = 0; k < top_k_; k++) {
+        if (bottom_data_vector[k].second == label_value) {
+          ++accuracy;
+          break;
+        }
+      }
+      ++count;
+    }
+  }
+
+  // LOG(INFO) << "Accuracy: " << accuracy;
+  top[0]->mutable_cpu_data()[0] = accuracy / count;
+  // Accuracy layer should not be used as a loss function.
+}
+
+INSTANTIATE_CLASS(AccuracyLayer);
+REGISTER_LAYER_CLASS(Accuracy);
+
+}  // namespace caffe
