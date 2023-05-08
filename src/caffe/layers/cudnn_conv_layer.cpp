@@ -121,4 +121,10 @@ CuDNNConvolutionLayer<Dtype>::~CuDNNConvolutionLayer() {
   }
 
   delete [] stream_;
-  delete
+  delete [] handle_;
+}
+
+INSTANTIATE_CLASS(CuDNNConvolutionLayer);
+
+}   // namespace caffe
+#endif
