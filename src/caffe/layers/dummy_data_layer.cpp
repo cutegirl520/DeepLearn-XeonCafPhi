@@ -89,4 +89,28 @@ void DummyDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       top[i]->Reshape(param.shape(shape_index));
     }
   }
-  // Run Forward once, with refill_ inve
+  // Run Forward once, with refill_ inverted, to fill the constant Blobs.
+  this->Forward(bottom, top);
+  // Invert the inverted refill_ values to refill the desired (non-constant)
+  // Blobs in every usual forward pass.
+  for (int i = 0; i < refill_.size(); ++i) {
+    refill_[i] = !refill_[i];
+  }
+}
+
+template <typename Dtype>
+void DummyDataLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
+  LOG(INFO) << "Forward_cpu in DummyDataLayer";
+  for (int i = 0; i < top.size(); ++i) {
+    const int filler_id = (fillers_.size() > 1) ? i : 0;
+    if (refill_[filler_id]) {
+      fillers_[filler_id]->Fill(top[i]);
+    }
+  }
+}
+
+INSTANTIATE_CLASS(DummyDataLayer);
+REGISTER_LAYER_CLASS(DummyData);
+
+}  // namespace caffe
