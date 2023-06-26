@@ -28,4 +28,19 @@ void TanHLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const Dtype* top_data = top[0]->cpu_data();
     const Dtype* top_diff = top[0]->cpu_diff();
     Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
- 
+    const int count = bottom[0]->count();
+    Dtype tanhx;
+    for (int i = 0; i < count; ++i) {
+      tanhx = top_data[i];
+      bottom_diff[i] = top_diff[i] * (1 - tanhx * tanhx);
+    }
+  }
+}
+
+#ifdef CPU_ONLY
+STUB_GPU(TanHLayer);
+#endif
+
+INSTANTIATE_CLASS(TanHLayer);
+
+}  // namespace caffe
