@@ -371,4 +371,96 @@ void WindowDataLayer<Dtype>::InternalThreadEntry() {
         }
 
         // ensure that the warped, clipped region plus the padding fits in the
-        // crop_size x crop_s
+        // crop_size x crop_size image (it might not due to rounding)
+        if (pad_h + cv_crop_size.height > crop_size) {
+          cv_crop_size.height = crop_size - pad_h;
+        }
+        if (pad_w + cv_crop_size.width > crop_size) {
+          cv_crop_size.width = crop_size - pad_w;
+        }
+      }
+
+      cv::Rect roi(x1, y1, x2-x1+1, y2-y1+1);
+      cv::Mat cv_cropped_img = cv_img(roi);
+      cv::resize(cv_cropped_img, cv_cropped_img,
+          cv_crop_size, 0, 0, cv::INTER_LINEAR);
+
+      // horizontal flip at random
+      if (do_mirror) {
+        cv::flip(cv_cropped_img, cv_cropped_img, 1);
+      }
+
+      // copy the warped window into top_data
+      for (int h = 0; h < cv_cropped_img.rows; ++h) {
+        const uchar* ptr = cv_cropped_img.ptr<uchar>(h);
+        int img_index = 0;
+        for (int w = 0; w < cv_cropped_img.cols; ++w) {
+          for (int c = 0; c < channels; ++c) {
+            int top_index = ((item_id * channels + c) * crop_size + h + pad_h)
+                     * crop_size + w + pad_w;
+            // int top_index = (c * height + h) * width + w;
+            Dtype pixel = static_cast<Dtype>(ptr[img_index++]);
+            if (this->has_mean_file_) {
+              int mean_index = (c * mean_height + h + mean_off + pad_h)
+                           * mean_width + w + mean_off + pad_w;
+              top_data[top_index] = (pixel - mean[mean_index]) * scale;
+            } else {
+              if (this->has_mean_values_) {
+                top_data[top_index] = (pixel - this->mean_values_[c]) * scale;
+              } else {
+                top_data[top_index] = pixel * scale;
+              }
+            }
+          }
+        }
+      }
+      trans_time += timer.MicroSeconds();
+      // get window label
+      top_label[item_id] = window[WindowDataLayer<Dtype>::LABEL];
+
+      #if 0
+      // useful debugging code for dumping transformed windows to disk
+      string file_id;
+      std::stringstream ss;
+      ss << PrefetchRand();
+      ss >> file_id;
+      std::ofstream inf((string("dump/") + file_id +
+          string("_info.txt")).c_str(), std::ofstream::out);
+      inf << image.first << std::endl
+          << window[WindowDataLayer<Dtype>::X1]+1 << std::endl
+          << window[WindowDataLayer<Dtype>::Y1]+1 << std::endl
+          << window[WindowDataLayer<Dtype>::X2]+1 << std::endl
+          << window[WindowDataLayer<Dtype>::Y2]+1 << std::endl
+          << do_mirror << std::endl
+          << top_label[item_id] << std::endl
+          << is_fg << std::endl;
+      inf.close();
+      std::ofstream top_data_file((string("dump/") + file_id +
+          string("_data.txt")).c_str(),
+          std::ofstream::out | std::ofstream::binary);
+      for (int c = 0; c < channels; ++c) {
+        for (int h = 0; h < crop_size; ++h) {
+          for (int w = 0; w < crop_size; ++w) {
+            top_data_file.write(reinterpret_cast<char*>(
+                &top_data[((item_id * channels + c) * crop_size + h)
+                          * crop_size + w]),
+                sizeof(Dtype));
+          }
+        }
+      }
+      top_data_file.close();
+      #endif
+
+      item_id++;
+    }
+  }
+  batch_timer.Stop();
+  DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
+  DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
+  DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
+}
+
+INSTANTIATE_CLASS(WindowDataLayer);
+REGISTER_LAYER_CLASS(WindowData);
+
+}  // namespace caffe
