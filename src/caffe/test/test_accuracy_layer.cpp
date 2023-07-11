@@ -215,4 +215,20 @@ TYPED_TEST(AccuracyLayerTest, TestForwardCPUTopK) {
     for (int j = 0; j < 10; ++j) {
       current_value = this->blob_bottom_data_->data_at(i, j, 0, 0);
       current_rank = 0;
-      for (int
+      for (int k = 0; k < 10; ++k) {
+        if (this->blob_bottom_data_->data_at(i, k, 0, 0) > current_value) {
+          ++current_rank;
+        }
+      }
+      if (current_rank < this->top_k_ &&
+          j == this->blob_bottom_label_->data_at(i, 0, 0, 0)) {
+        ++num_correct_labels;
+      }
+    }
+  }
+
+  EXPECT_NEAR(this->blob_top_->data_at(0, 0, 0, 0),
+              num_correct_labels / 100.0, 1e-4);
+}
+
+}  // namespace caffe
