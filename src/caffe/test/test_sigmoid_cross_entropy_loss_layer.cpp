@@ -69,4 +69,54 @@ class SigmoidCrossEntropyLossLayerTest : public MultiDeviceTest<TypeParam> {
     data_filler_param.set_std(1);
     GaussianFiller<Dtype> data_filler(data_filler_param);
     FillerParameter targets_filler_param;
-    targets
+    targets_filler_param.set_min(0.0);
+    targets_filler_param.set_max(1.0);
+    UniformFiller<Dtype> targets_filler(targets_filler_param);
+    Dtype eps = 2e-2;
+    for (int i = 0; i < 100; ++i) {
+      // Fill the data vector
+      data_filler.Fill(this->blob_bottom_data_);
+      // Fill the targets vector
+      targets_filler.Fill(this->blob_bottom_targets_);
+      SigmoidCrossEntropyLossLayer<Dtype> layer(layer_param);
+      layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+      Dtype layer_loss =
+          layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+      const int count = this->blob_bottom_data_->count();
+      const int num = this->blob_bottom_data_->num();
+      const Dtype* blob_bottom_data = this->blob_bottom_data_->cpu_data();
+      const Dtype* blob_bottom_targets =
+          this->blob_bottom_targets_->cpu_data();
+      Dtype reference_loss = kLossWeight * SigmoidCrossEntropyLossReference(
+          count, num, blob_bottom_data, blob_bottom_targets);
+      EXPECT_NEAR(reference_loss, layer_loss, eps) << "debug: trial #" << i;
+    }
+  }
+
+  Blob<Dtype>* const blob_bottom_data_;
+  Blob<Dtype>* const blob_bottom_targets_;
+  Blob<Dtype>* const blob_top_loss_;
+  vector<Blob<Dtype>*> blob_bottom_vec_;
+  vector<Blob<Dtype>*> blob_top_vec_;
+};
+
+TYPED_TEST_CASE(SigmoidCrossEntropyLossLayerTest, TestDtypesAndDevices);
+
+TYPED_TEST(SigmoidCrossEntropyLossLayerTest, TestSigmoidCrossEntropyLoss) {
+  this->TestForward();
+}
+
+TYPED_TEST(SigmoidCrossEntropyLossLayerTest, TestGradient) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  const Dtype kLossWeight = 3.7;
+  layer_param.add_loss_weight(kLossWeight);
+  SigmoidCrossEntropyLossLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_, 0);
+}
+
+
+}  // namespace caffe
