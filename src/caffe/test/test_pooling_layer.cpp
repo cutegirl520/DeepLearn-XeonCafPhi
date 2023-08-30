@@ -866,4 +866,181 @@ class CuDNNPoolingLayerTest : public ::testing::Test {
       blob_bottom_->mutable_cpu_data()[i + 13] = 9;
       blob_bottom_->mutable_cpu_data()[i + 14] = 2;
       blob_bottom_->mutable_cpu_data()[i + 15] = 22;
-      blob_bottom_->mutable_cpu_data()[i + 16]
+      blob_bottom_->mutable_cpu_data()[i + 16] = 27;
+      blob_bottom_->mutable_cpu_data()[i + 17] = 20;
+      blob_bottom_->mutable_cpu_data()[i + 18] = 8;
+      blob_bottom_->mutable_cpu_data()[i + 19] = 28;
+      blob_bottom_->mutable_cpu_data()[i + 20] = 33;
+      blob_bottom_->mutable_cpu_data()[i + 21] = 17;
+      blob_bottom_->mutable_cpu_data()[i + 22] = 10;
+      blob_bottom_->mutable_cpu_data()[i + 23] = 15;
+      blob_bottom_->mutable_cpu_data()[i + 24] = 30;
+      blob_bottom_->mutable_cpu_data()[i + 25] = 5;
+      blob_bottom_->mutable_cpu_data()[i + 26] = 34;
+      blob_bottom_->mutable_cpu_data()[i + 27] = 12;
+      blob_bottom_->mutable_cpu_data()[i + 28] = 14;
+      blob_bottom_->mutable_cpu_data()[i + 29] = 16;
+      blob_bottom_->mutable_cpu_data()[i + 30] = 4;
+      blob_bottom_->mutable_cpu_data()[i + 31] = 36;
+      blob_bottom_->mutable_cpu_data()[i + 32] = 29;
+      blob_bottom_->mutable_cpu_data()[i + 33] = 13;
+      blob_bottom_->mutable_cpu_data()[i + 34] = 18;
+      blob_bottom_->mutable_cpu_data()[i + 35] = 11;
+    }
+    CuDNNPoolingLayer<Dtype> layer(layer_param);
+    layer.SetUp(blob_bottom_vec_, blob_top_vec_);
+    EXPECT_EQ(blob_top_->num(), num);
+    EXPECT_EQ(blob_top_->channels(), channels);
+    EXPECT_EQ(blob_top_->height(), 5);
+    EXPECT_EQ(blob_top_->width(), 4);
+    if (blob_top_vec_.size() > 1) {
+      EXPECT_EQ(blob_top_mask_->num(), num);
+      EXPECT_EQ(blob_top_mask_->channels(), channels);
+      EXPECT_EQ(blob_top_mask_->height(), 5);
+      EXPECT_EQ(blob_top_mask_->width(), 4);
+    }
+    layer.Forward(blob_bottom_vec_, blob_top_vec_);
+    // Expected output: 2x 2 channels of:
+    // [35    32    26    26]
+    // [32    32    27    27]
+    // [33    33    33    27]
+    // [34    34    34    17]
+    // [36    36    34    18]
+    for (int i = 0; i < 20 * num * channels; i += 20) {
+      EXPECT_EQ(blob_top_->cpu_data()[i +  0], 35);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  1], 32);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  2], 26);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  3], 26);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  4], 32);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  5], 32);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  6], 27);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  7], 27);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  8], 33);
+      EXPECT_EQ(blob_top_->cpu_data()[i +  9], 33);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 10], 33);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 11], 27);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 12], 34);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 13], 34);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 14], 34);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 15], 17);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 16], 36);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 17], 36);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 18], 34);
+      EXPECT_EQ(blob_top_->cpu_data()[i + 19], 18);
+    }
+    if (blob_top_vec_.size() > 1) {
+        // [ 1     8     4     4]
+        // [ 8     8    17    17]
+        // [21    21    21    17]
+        // [27    27    27    22]
+        // [32    32    27    35]
+      for (int i = 0; i < 20 * num * channels; i += 20) {
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  0],  0);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  1],  7);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  2],  3);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  3],  3);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  4],  7);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  5],  7);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  6], 16);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  7], 16);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  8], 20);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i +  9], 20);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 10], 20);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 11], 16);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 12], 26);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 13], 26);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 14], 26);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 15], 21);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 16], 31);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 17], 31);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 18], 26);
+        EXPECT_EQ(blob_top_mask_->cpu_data()[i + 19], 34);
+      }
+    }
+  }
+};
+
+TYPED_TEST_CASE(CuDNNPoolingLayerTest, TestDtypes);
+
+TYPED_TEST(CuDNNPoolingLayerTest, TestSetupCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  LayerParameter layer_param;
+  PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+  pooling_param->set_kernel_size(3);
+  pooling_param->set_stride(2);
+  CuDNNPoolingLayer<TypeParam> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), this->blob_bottom_->num());
+  EXPECT_EQ(this->blob_top_->channels(), this->blob_bottom_->channels());
+  EXPECT_EQ(this->blob_top_->height(), 3);
+  EXPECT_EQ(this->blob_top_->width(), 2);
+}
+
+TYPED_TEST(CuDNNPoolingLayerTest, TestSetupPaddedCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  LayerParameter layer_param;
+  PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+  pooling_param->set_kernel_size(3);
+  pooling_param->set_stride(2);
+  pooling_param->set_pad(1);
+  pooling_param->set_pool(PoolingParameter_PoolMethod_AVE);
+  CuDNNPoolingLayer<TypeParam> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), this->blob_bottom_->num());
+  EXPECT_EQ(this->blob_top_->channels(), this->blob_bottom_->channels());
+  EXPECT_EQ(this->blob_top_->height(), 4);
+  EXPECT_EQ(this->blob_top_->width(), 3);
+}
+
+/*
+TYPED_TEST(CuDNNPoolingLayerTest, PrintBackwardCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  LayerParameter layer_param;
+  layer_param.set_kernelsize(3);
+  layer_param.set_stride(2);
+  layer_param.set_pool(LayerParameter_PoolMethod_MAX);
+  CuDNNPoolingLayer<TypeParam> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  for (int i = 0; i < this->blob_bottom_->count(); ++i) {
+    cout << "bottom data " << i << " " << this->blob_bottom_->cpu_data()[i] << endl;
+  }
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    cout << "top data " << i << " " << this->blob_top_->cpu_data()[i] << endl;
+  }
+
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    this->blob_top_->mutable_cpu_diff()[i] = i;
+  }
+  layer.Backward(this->blob_top_vec_, true, this->blob_bottom_vec_);
+  for (int i = 0; i < this->blob_bottom_->count(); ++i) {
+    cout << "bottom diff " << i << " " << this->blob_bottom_->cpu_diff()[i] << endl;
+  }
+}
+*/
+
+TYPED_TEST(CuDNNPoolingLayerTest, TestForwardMaxCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  this->TestForwardSquare();
+  this->TestForwardRectHigh();
+  this->TestForwardRectWide();
+}
+
+// Currently, cuDNN does not support a top mask, so we comment this and
+// the corresponding backward test.
+/*
+TYPED_TEST(CuDNNPoolingLayerTest, TestForwardMaxTopMaskCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  this->blob_top_vec_.push_back(this->blob_top_mask_);
+  this->TestForwardSquare();
+  this->TestForwardRectHigh();
+  this->TestForwardRectWide();
+}
+*/
+
+TYPED_TEST(CuDNNPoolingLayerTest, TestGradientMaxCuDNN) {
+  Caffe::set_mode(Caffe::GPU);
+  for (int kernel_h = 3; kernel_h <= 4; kernel_h++) {
+    for (int kernel_w = 3; kernel_w <= 4; kernel_w++) {
+      LayerParameter layer_param;
+      PoolingParameter* pooling_param = layer_par
