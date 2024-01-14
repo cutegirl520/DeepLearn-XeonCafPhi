@@ -2847,4 +2847,63 @@ TEST_F(NetUpgradeTest, TestImageNet) {
       "  top: 'fc7' "
       "} "
       "layer { "
-      "  name
+      "  name: 'drop7' "
+      "  type: 'Dropout' "
+      "  dropout_param { "
+      "    dropout_ratio: 0.5 "
+      "  } "
+      "  bottom: 'fc7' "
+      "  top: 'fc7' "
+      "} "
+      "layer { "
+      "  name: 'fc8' "
+      "  type: 'InnerProduct' "
+      "  inner_product_param { "
+      "    num_output: 1000 "
+      "    weight_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    bias_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  param { "
+      "    lr_mult: 1 "
+      "    decay_mult: 1 "
+      "  } "
+      "  param { "
+      "    lr_mult: 2 "
+      "    decay_mult: 0 "
+      "  } "
+      "  bottom: 'fc7' "
+      "  top: 'fc8' "
+      "} "
+      "layer { "
+      "  name: 'loss' "
+      "  type: 'SoftmaxWithLoss' "
+      "  bottom: 'fc8' "
+      "  bottom: 'label' "
+      "} ";
+  this->RunV1UpgradeTest(expected_v1_proto, expected_v2_proto);
+}  // NOLINT(readability/fn_size)
+
+TEST_F(NetUpgradeTest, TestUpgradeV1LayerType) {
+  LayerParameter layer_param;
+  shared_ptr<Layer<float> > layer;
+  for (int i = 0; i < V1LayerParameter_LayerType_LayerType_ARRAYSIZE; ++i) {
+    ASSERT_TRUE(V1LayerParameter_LayerType_IsValid(i));
+    V1LayerParameter_LayerType v1_type = V1LayerParameter_LayerType(i);
+    string v2_layer_type(UpgradeV1LayerType(v1_type));
+    if (v2_layer_type == "") {
+      EXPECT_EQ(V1LayerParameter_LayerType_NONE, v1_type);
+      continue;  // Empty string isn't actually a valid layer type.
+    }
+    layer_param.set_type(v2_layer_type);
+    layer = LayerRegistry<float>::CreateLayer(layer_param);
+    EXPECT_EQ(v2_layer_type, layer->type());
+  }
+}
+
+}  // NOLINT(readability/fn_size)  // namespace caffe
