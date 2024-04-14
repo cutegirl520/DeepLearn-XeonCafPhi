@@ -90,4 +90,68 @@ def parse_log(path_to_log):
                 # loss for test data so the test_accuracy variable is already
                 # correctly populated and (2) there's one and only one output
                 # named "accuracy" for the test net
-                test_dict_list
+                test_dict_list.append({'NumIters': iteration,
+                                       'Seconds': seconds,
+                                       'TestAccuracy': test_accuracy,
+                                       'TestLoss': test_loss})
+
+    return train_dict_list, train_dict_names, test_dict_list, test_dict_names
+
+
+def save_csv_files(logfile_path, output_dir, train_dict_list, train_dict_names,
+                   test_dict_list, test_dict_names, verbose=False):
+    """Save CSV files to output_dir
+
+    If the input log file is, e.g., caffe.INFO, the names will be
+    caffe.INFO.train and caffe.INFO.test
+    """
+
+    log_basename = os.path.basename(logfile_path)
+    train_filename = os.path.join(output_dir, log_basename + '.train')
+    write_csv(train_filename, train_dict_list, train_dict_names, verbose)
+
+    test_filename = os.path.join(output_dir, log_basename + '.test')
+    write_csv(test_filename, test_dict_list, test_dict_names, verbose)
+
+
+def write_csv(output_filename, dict_list, header_names, verbose=False):
+    """Write a CSV file
+    """
+
+    with open(output_filename, 'w') as f:
+        dict_writer = csv.DictWriter(f, header_names)
+        dict_writer.writeheader()
+        dict_writer.writerows(dict_list)
+    if verbose:
+        print 'Wrote %s' % output_filename
+
+
+def parse_args():
+    description = ('Parse a Caffe training log into two CSV files '
+                   'containing training and testing information')
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('logfile_path',
+                        help='Path to log file')
+
+    parser.add_argument('output_dir',
+                        help='Directory in which to place output CSV files')
+
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Print some extra info (e.g., output filenames)')
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+    train_dict_list, train_dict_names, test_dict_list, test_dict_names = \
+        parse_log(args.logfile_path)
+    save_csv_files(args.logfile_path, args.output_dir, train_dict_list,
+                   train_dict_names, test_dict_list, test_dict_names)
+
+
+if __name__ == '__main__':
+    main()
