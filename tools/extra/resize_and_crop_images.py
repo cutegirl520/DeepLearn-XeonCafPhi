@@ -52,4 +52,58 @@ class PILResizeCrop:
         #calculate the cropping box and get the cropped part
         if fit:
             x1 = y1 = 0
-           
+            x2, y2 = img.size
+            wRatio = 1.0 * x2/box[0]
+            hRatio = 1.0 * y2/box[1]
+            if hRatio > wRatio:
+                y1 = int(y2/2-box[1]*wRatio/2)
+                y2 = int(y2/2+box[1]*wRatio/2)
+            else:
+                x1 = int(x2/2-box[0]*hRatio/2)
+                x2 = int(x2/2+box[0]*hRatio/2)
+            img = img.crop((x1,y1,x2,y2))
+
+        #Resize the image with best quality algorithm ANTI-ALIAS
+        img.thumbnail(box, Image.ANTIALIAS)
+
+        #save it into a file-like object
+        with open(output_file, 'wb') as out:
+            img.save(out, 'JPEG', quality=75)
+
+class ResizeCropImagesMapper(mapreducer.BasicMapper):
+    '''The ImageNet Compute mapper. 
+    The input value would be the file listing images' paths relative to input_folder.
+    '''
+    def map(self, key, value):
+        if type(value) is not str:
+            value = str(value)
+        files = [value]
+        image_lib = FLAGS.image_lib.lower()
+        if image_lib == 'pil':
+            resize_crop = PILResizeCrop()
+        else:
+            resize_crop = OpenCVResizeCrop()
+        for i, line in enumerate(files):
+            try:
+                line = line.replace(FLAGS.input_folder, '').strip()
+                line = line.split()
+                image_file_name = line[0]
+                input_file = os.path.join(FLAGS.input_folder, image_file_name)
+                output_file = os.path.join(FLAGS.output_folder, image_file_name)
+                output_dir = output_file[:output_file.rfind('/')]
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+                feat = resize_crop.resize_and_crop_image(input_file, output_file,
+                                                              FLAGS.output_side_length)
+            except Exception, e:
+                # we ignore the exception (maybe the image is corrupted?)
+                print line, Exception, e
+        yield value, FLAGS.output_folder
+
+mapreducer.REGISTER_DEFAULT_MAPPER(ResizeCropImagesMapper)
+
+mapreducer.REGISTER_DEFAULT_READER(mapreducer.FileReader)
+mapreducer.REGISTER_DEFAULT_WRITER(mapreducer.FileWriter)
+ 
+if __name__ == '__main__':
+    launcher.launch()
